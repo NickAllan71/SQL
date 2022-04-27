@@ -1,0 +1,1 @@
+ CONSTRAINT DF_<TableName, SYSNAME, YourTable>_<ColumnName, SYSNAME, CreatedDateTime> DEFAULT <DefaultValue, , GETDATE()>

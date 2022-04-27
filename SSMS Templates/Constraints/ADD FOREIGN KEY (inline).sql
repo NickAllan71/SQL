@@ -1,0 +1,2 @@
+ CONSTRAINT FK_<TableName, SYSNAME, YourTable>_<ReferencedTableName, SYSNAME, ReferencedTable>
+		FOREIGN KEY REFERENCES <ReferencedSchemaName, SYSNAME, dbo>.<ReferencedTableName, , >(<ReferencedColumn, SYSNAME, ReferencedColumn>) <CascadeDelete, behaviour, ON DELETE CASCADE>

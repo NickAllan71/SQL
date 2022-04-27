@@ -1,0 +1,2 @@
+IF SCHEMA_ID('interview') IS NULL
+	EXEC ('CREATE SCHEMA interview AUTHORIZATION dbo;');
