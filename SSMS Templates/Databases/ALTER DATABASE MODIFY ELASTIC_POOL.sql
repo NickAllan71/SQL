@@ -1,7 +1,7 @@
 --Run this from master
 ALTER DATABASE [<DatabaseName, SYSNAME, YourDatabase>]
 	MODIFY (
-		SERVICE_OBJECTIVE = ELASTIC_POOL (name = [<ElasticPoolName, SYSNAME, diligenciasqlpool>])
+		SERVICE_OBJECTIVE = ELASTIC_POOL (name = [<ElasticPoolName, SYSNAME, >])
 		);
 
 --Check status as follows:
