@@ -22,26 +22,25 @@ If Not Exist "%DestinationPath%" (
 )
 
 Set TemplatePath=%DestinationPath%\Templates\Sql\(%TemplateFolder%)
-If Not Exist "%TemplatePath%" (
-	Echo 1. Open Sql Server Management Studio
-	Echo 2. View ^> Template Explorer
-	Echo 3. Right-click "SQL Server Templates"
-	Echo 4. New ^> Folder
-	Echo 5. Specify folder name: (%TemplateFolder%^)
-	Pause
-)
-
 Echo Installing templates to:
 Echo %TemplatePath%
 Echo.
 
+If Exist "%TemplatePath%" (
+    Del "%TemplatePath%" /Q
+)
+
 Set ExistingFiles=%TemplatePath%\*.sql
 If Exist "%ExistingFiles%" Del "%ExistingFiles%" /s
-XCopy "%ThisPath%*.sql" "%TemplatePath%" /S
+XCopy "%ThisPath%*.sql" "%TemplatePath%" /S /i /Y /Q
+pause
+Set TemplateAuthor=%USERNAME%
+Set /P TemplateAuthor=Choose default template author (%TemplateAuthor%): 
+Powershell.exe -ExecutionPolicy Bypass -File SearchAndReplace.ps1 -RootFolder "%TemplatePath%" -FileSpec "*.sql" -SearchTarget "Nick Allan" -ReplacementText "%TemplateAuthor%"
+
 Echo.
-Echo 6. Close and re-open Sql Server Management Studio.
-Pause
-Echo 7. View ^> Template Explorer
-Echo 8. Expand (%TemplateFolder%^)
-Echo 9. The above templates should now be visible.
+Echo 1. Close and re-open Sql Server Management Studio
+Echo 2. View ^> Template Explorer
+Echo 3. Expand (%TemplateFolder%^)
+Echo 4. The above templates should now be visible.
 Pause
