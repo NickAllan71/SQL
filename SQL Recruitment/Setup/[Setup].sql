@@ -1,7 +1,7 @@
 /*
-Description:    Script bundled from C:\DiligenciaStudio\Dev\SQL Recruitment\Setup
-Author:         Nick Allan
-Date:           26/01/2022 18:15:53
+Description:    Script bundled from C:\Git Repos\NicksGitHub\SQL\SQL Recruitment\Setup
+Author:         Nick Allan (assumed)
+Date:           04/02/2024 00:11:10
 	01. Create schema interview.sql
 	02. Create candidate.sql
 */
@@ -14,7 +14,7 @@ IF @@ERROR <> 0 SET NOEXEC ON;
 GO
 PRINT 'Script: 02. Create candidate.sql';
 GO
---Run from DB(s) user requires access to.  E.g. diligencia-t
+--Run from DB(s) user requires access to
 DROP USER IF EXISTS [candidate];
 GO
 CREATE USER [candidate] WITH PASSWORD = 'Int3rv13w';

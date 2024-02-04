@@ -1,9 +1,9 @@
 Prior to interview set up candidate environment as follows:
 
 1. Open SSMS
-2. File > Open Folder > (this folder)
+2. File > Open Folder > "SQL Recruitment"
 3. Click "Select Folder"
-4. Connect to a database
+4. Connect to target database
 5. Connect using a normal dev account
 6. Run Setup\"Script to clear down previous candidate.sql"
 7. Run Setup\[Setup].sql
@@ -12,8 +12,6 @@ Prior to interview set up candidate environment as follows:
 	Pwd: Int3rv13w
 9. Check "Remember password"
 10. Click "Options >>"
-11. Connect to database
+11. Connect to target database
 
 During interview candidate can open each script under "Questions" in sequence.
-
-	
