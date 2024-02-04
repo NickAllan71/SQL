@@ -1,6 +1,6 @@
---Run from "master" with diligenciaadmin login
-DROP DATABASE IF EXISTS [<NewDatabaseName, SYSNAME, diligencia-t>];
-CREATE DATABASE [<NewDatabaseName, , >] AS COPY OF [<SourceDatabaseName, SYSNAME, diligencia-p>];
+--Run from "master"
+DROP DATABASE IF EXISTS [<NewDatabaseName, SYSNAME, YourNewDatabase>];
+CREATE DATABASE [<NewDatabaseName, , >] AS COPY OF [<SourceDatabaseName, SYSNAME, YourSourceDatabase>];
 
 /* Monitor progress in a separate query:
 SELECT * FROM sys.dm_database_copies;
