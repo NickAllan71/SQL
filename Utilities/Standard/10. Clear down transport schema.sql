@@ -1,0 +1,5 @@
+DROP PROCEDURE IF EXISTS [transport].[usp_ImportXML]
+DROP PROCEDURE IF EXISTS [transport].[usp_ImportXML_ByTableName]
+DROP PROCEDURE IF EXISTS [transport].[usp_ScriptImport]
+DROP FUNCTION IF EXISTS [transport].[fn_GetTableDefinition]
+DROP SCHEMA IF EXISTS [transport]
