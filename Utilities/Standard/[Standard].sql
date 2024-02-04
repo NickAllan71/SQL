@@ -1,15 +1,17 @@
 /*
-Description:    Script bundled from C:\GitHub\NickAllan71\SQL\Utilities\Standard
-Author:         Nick Allan
-Date:           03/05/2022 15:31:04
+Description:    Script bundled from C:\Git Repos\NicksGitHub\SQL\Utilities\Standard
+Author:         Nick Allan (assumed)
+Date:           04/02/2024 00:18:37
 	01. Cleardown.sql
-	..\..\..\..\..\DiligenciaStudio\Dev\SQL\diligencia-p\StoredProcedures\dbo.sp_Find.sql
-	..\..\..\..\..\DiligenciaStudio\Dev\SQL\diligencia-p\StoredProcedures\dbo.sp_FindCode.sql
-	..\..\..\..\..\DiligenciaStudio\Dev\SQL\diligencia-p\StoredProcedures\dbo.sp_MatchTableName.sql
-	..\..\..\..\..\DiligenciaStudio\Dev\SQL\diligencia-p\StoredProcedures\dbo.sp_Join.sql
-	..\..\..\..\..\DiligenciaStudio\Dev\SQL\diligencia-p\StoredProcedures\dbo.sp_ScriptExecute.sql
-	..\..\..\..\..\DiligenciaStudio\Dev\SQL\diligencia-p\StoredProcedures\dbo.sp_ScriptInsert.sql
-	..\..\..\..\..\DiligenciaStudio\Dev\SQL\diligencia-p\StoredProcedures\dbo.sp_LaunchTool.sql
+	..\..\..\..\DB.SQLServer\SQL\diligencia-p\StoredProcedures\dbo.sp_Find.sql
+	..\..\..\..\DB.SQLServer\SQL\diligencia-p\StoredProcedures\dbo.sp_FindCode.sql
+	..\..\..\..\DB.SQLServer\SQL\diligencia-p\StoredProcedures\dbo.sp_MatchTableName.sql
+	02. dbo.usp_StripCommentsFromCode.sql
+	..\..\..\..\DB.SQLServer\SQL\diligencia-p\StoredProcedures\dbo.sp_Join.sql
+	..\..\..\..\DB.SQLServer\SQL\diligencia-p\StoredProcedures\dbo.sp_ScriptExecute.sql
+	..\..\..\..\DB.SQLServer\SQL\diligencia-p\StoredProcedures\dbo.sp_ScriptInsert.sql
+	..\..\..\..\DB.SQLServer\SQL\diligencia-p\StoredProcedures\dbo.sp_ScriptObject.sql
+	..\..\..\..\DB.SQLServer\SQL\diligencia-p\StoredProcedures\dbo.sp_LaunchTool.sql
 */
 PRINT 'Script: 01. Cleardown.sql';
 GO
@@ -17,8 +19,10 @@ DROP PROCEDURE IF EXISTS dbo.sp_Find;
 DROP PROCEDURE IF EXISTS dbo.sp_FindCode;
 DROP PROCEDURE IF EXISTS dbo.sp_MatchTableName;
 DROP PROCEDURE IF EXISTS dbo.sp_Join;
+DROP PROCEDURE IF EXISTS dbo.usp_StripCommentsFromCode;
 DROP PROCEDURE IF EXISTS dbo.sp_ScriptExecute;
 DROP PROCEDURE IF EXISTS dbo.sp_ScriptInsert;
+DROP PROCEDURE IF EXISTS dbo.sp_ScriptObject;
 DROP PROCEDURE IF EXISTS dbo.sp_LaunchTool;
 GO
 IF @@ERROR <> 0 SET NOEXEC ON;
@@ -30,16 +34,16 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 /*
-
+ 
 Description:	Utility procedure to find objects matching a given @SearchTarget
 Created:		28 Jun 2017
 Author:			Nick Allan
-
+ 
 --Example use:
 EXEC sp_Find dbo
 EXEC sp_Find OrgId
 EXEC sp_Find IX_
-
+ 
 */
 CREATE PROCEDURE dbo.sp_Find
 	(
@@ -55,7 +59,7 @@ BEGIN;
 		THEN @SearchTarget
 		ELSE CONCAT(N'%', @SearchTarget, N'%')
 		END;
-
+ 
 	DROP TABLE IF EXISTS #FoundObjects;
 	WITH cteFoundObjects
 		AS
@@ -73,7 +77,7 @@ BEGIN;
 			WHERE CONCAT(s.[name], N'.', o.[name]) LIKE @WidenedSearchTarget
 				AND o.[type] NOT IN ('S', 'IT', 'SQ') --Internal system types inaccessible to users anyway
 		UNION ALL
-		SELECT FoundObject = CONCAT(s.[name], N'.', 
+		SELECT FoundObject = CONCAT(s.[name], N'.',
 				CASE WHEN o.[name] LIKE '% %' THEN QUOTENAME(o.[name]) ELSE o.[name] END
 				),
 			FoundIndex = CASE WHEN i.[name] LIKE '% %' THEN QUOTENAME(i.[name]) ELSE i.[name] END,
@@ -85,7 +89,7 @@ BEGIN;
 					ON s.[schema_id] = o.[schema_id]
 				INNER JOIN sys.indexes AS i
 					ON o.[object_id] = i.[object_id]
-			WHERE i.[name] LIKE @SearchTarget + '%'
+			WHERE i.[name] LIKE @WidenedSearchTarget
 		UNION ALL
 		SELECT FoundObject = CASE WHEN [name] LIKE '% %' THEN QUOTENAME([name]) ELSE [name] END,
 			FoundIndex = NULL,
@@ -94,10 +98,19 @@ BEGIN;
 			modify_date = updatedate
 			FROM dbo.sysusers
 			WHERE [name] LIKE @WidenedSearchTarget
+		UNION ALL
+		SELECT FoundObject = CASE WHEN [name] LIKE '% %' THEN QUOTENAME([name]) ELSE [name] END,
+			FoundIndex = NULL,
+			[type],
+			ObjectType = 'DDL TRIGGER',
+			modify_date
+			FROM sys.triggers
+			WHERE [name] LIKE @WidenedSearchTarget
+				AND parent_class_desc = 'DATABASE'
 		)
 		SELECT *,
 			ViewDefinition = FORMATMESSAGE(
-				CASE WHEN [type] IN ('P', 'TR', 'V', 'IF', 'TF', 'FN') THEN N'EXEC sp_ScriptObject N''%s'';'
+				CASE WHEN [type] IN ('P', 'V', 'IF', 'TF', 'FN', 'TR') THEN N'EXEC sp_ScriptObject N''%s'';'
 				WHEN FoundIndex IS NOT NULL THEN N'EXEC sp_helpindex N''%s'';'
 				WHEN ObjectType = 'LOGIN' THEN N'EXEC sp_helplogins N''%s'';'
 				WHEN ObjectType = 'USER' THEN N'SELECT * FROM sys.sysusers WHERE name = N''%s'';'
@@ -110,7 +123,7 @@ BEGIN;
 	
 	DROP TABLE IF EXISTS #FoundColumns;
 	SELECT FoundColumn = CASE WHEN c.[name] LIKE '% %' THEN QUOTENAME(c.[name]) ELSE c.[name] END,
-		FoundObject = CONCAT(s.[name], N'.', 
+		FoundObject = CONCAT(s.[name], N'.',
 			CASE WHEN o.[name] LIKE '% %' THEN QUOTENAME(o.[name]) ELSE o.[name] END
 			),
 		o.[type],
@@ -123,7 +136,7 @@ BEGIN;
 		c.is_nullable,
 		is_defaulted = CONVERT(BIT, c.default_object_id),
 		ViewDefinition = FORMATMESSAGE(
-			CASE WHEN [type] IN ('P', 'TR', 'V', 'IF', 'TF', 'FN')
+			CASE WHEN [type] IN ('V', 'IF', 'TF', 'FN')
 			THEN N'EXEC sp_ScriptObject N''%s'';'
 			ELSE N'EXEC sp_help N''%s'';'
 			END,
@@ -139,7 +152,7 @@ BEGIN;
 				AND c.user_type_id = t.user_type_id
 		WHERE c.name LIKE @WidenedSearchTarget;
 	DECLARE @FoundColumns INT = @@ROWCOUNT;
-
+ 
 	IF @FoundObjects = 1 AND @FoundColumns = 0
 	BEGIN;
 		DECLARE @ViewDefinition VARCHAR(MAX) = (
@@ -150,22 +163,24 @@ BEGIN;
 		
 		RETURN;
 	END;
-
+ 
 	PRINT FORMATMESSAGE('Found %i objects and %i columns in database ''%s'' matching @WidenedSearchTarget ''%s''.',
 		@FoundObjects, @FoundColumns, DB_Name(), @WidenedSearchTarget);
-	
-	DROP TABLE IF EXISTS #SortOrder;
-	SELECT SortOrder = IDENTITY(INT, 1, 1),
-		[type] = [value]
-		INTO #SortOrder
-		FROM STRING_SPLIT('U,P,V,IF,TF,FN', ',');
-	
+		
 	IF @FoundObjects > 0
+	BEGIN;
+		DROP TABLE IF EXISTS #SortOrder;
+		SELECT SortOrder = ordinal,
+			[type] = [value]
+			INTO #SortOrder
+			FROM STRING_SPLIT('U,P,V,IF,TF,FN,TR', ',', 1);
+ 
 		SELECT f.* FROM #FoundObjects AS f
 			LEFT OUTER JOIN #SortOrder AS o
 				ON f.[type] = o.[type] COLLATE DATABASE_DEFAULT
-			ORDER BY o.SortOrder,
+			ORDER BY ISNULL(o.SortOrder, 100),
 				f.FoundObject;
+	END;
 	
 	IF @FoundColumns > 0
 		SELECT * FROM #FoundColumns
@@ -174,7 +189,6 @@ BEGIN;
 				FoundObject,
 				ObjectType;
 END;
-
 GO
 
 GO
@@ -324,6 +338,43 @@ BEGIN;
 
 	SET @TableName = @MatchedTableName;
 END;
+GO
+
+GO
+IF @@ERROR <> 0 SET NOEXEC ON;
+GO
+PRINT 'Script: 02. dbo.usp_StripCommentsFromCode.sql';
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+/*
+
+Description:	Procedure to remove comments from T-SQL code.
+Created:		18 Jul 2022
+Author:			Nick Allan
+
+*/
+CREATE   PROCEDURE dbo.usp_StripCommentsFromCode
+	(
+	@Code NVARCHAR(MAX) OUTPUT
+	)
+	AS
+BEGIN;
+	DECLARE @StartIndex INT = 1;
+	
+	SET @StartIndex = CHARINDEX('/*', @Code, @StartIndex);
+	WHILE @StartIndex > 0
+	BEGIN;
+		DECLARE @EndIndex INT = CHARINDEX('*/', @Code, @StartIndex + 2);
+		IF @EndIndex = 0 BREAK;
+
+		SELECT @Code = LEFT(@Code, @StartIndex - 1) + SUBSTRING(@Code, @EndIndex + 2, LEN(@Code)),
+			@StartIndex = 1;
+	END;
+END;
+
 GO
 
 GO
@@ -595,12 +646,12 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 /*
-
+ 
 Description:	Procedure to prepare an EXECUTE statement for a given procedure
 Author:			Nick Allan
 Date:			14 Apr 2017
-
---Example SQL... 
+ 
+--Example SQL...
 EXEC dbo.sp_ScriptExecute sp_find;
 EXEC dbo.sp_ScriptExecute usp_GetProjectIdByReference
 */
@@ -611,8 +662,8 @@ CREATE PROCEDURE dbo.sp_ScriptExecute
 	AS
 BEGIN;
 	SET NOCOUNT ON;
-
---DEBUG: declare @procedurename sysname = 'datafix.usp_Source_Assignment_Add';
+ 
+--DEBUG: declare @procedurename sysname = 'usp_Register_CreateQueueTable';
 	DECLARE @ObjectID INT,
 		@SearchTarget VARCHAR(255) = '%' + REPLACE(REPLACE(@ProcedureName, '[', ''), ']', '');
 	SELECT @ObjectID = [object_id]
@@ -624,15 +675,19 @@ BEGIN;
 		DECLARE @ErrorMessage VARCHAR(MAX) = FORMATMESSAGE('Found %i procedures matching "%s"', @RowCount, @ProcedureName);
 		THROW 50000, @ErrorMessage, 1;
 	END;
-
+ 
 	SET @ProcedureName = OBJECT_SCHEMA_NAME(@ObjectId) + '.' + OBJECT_NAME(@ObjectId);
-
+ 
 	DECLARE @Code VARCHAR(MAX)
-	SELECT @Code = SUBSTRING([definition],
-		PATINDEX('%CREATE PROC%' + OBJECT_NAME(@ObjectId) + '%AS%', [definition] COLLATE DATABASE_DEFAULT),
-		LEN([definition]))
+	SELECT @Code = [definition]
 		FROM sys.sql_modules
 		WHERE [object_id] = @ObjectID;
+
+	EXEC dbo.usp_StripCommentsFromCode @Code = @Code OUTPUT;
+
+	SET @Code = SUBSTRING(
+		@Code, PATINDEX('%CREATE[ 	]%PROC%' + OBJECT_NAME(@ObjectId) + '%AS%', @Code COLLATE DATABASE_DEFAULT),
+		LEN(@Code));
 
 	DROP TABLE IF EXISTS #Parameters;
 	CREATE TABLE #Parameters
@@ -648,7 +703,7 @@ BEGIN;
 		ParamDefault VARCHAR(100) NULL,
 		ValueDelimiter VARCHAR(2) NULL
 		);
-
+ 
 	INSERT #Parameters
 		(
 		ParameterName,
@@ -700,17 +755,17 @@ BEGIN;
 			StartIndex + 1
 			)
 		WHERE StartIndex > 0;
-
+ 
 --Look for parameters defaults...
 	UPDATE #Parameters
 		SET StartIndex = CHARINDEX('=', @Code, StartIndex)
 		WHERE StartIndex > 0;
-
+	
 	UPDATE #Parameters
 		SET ParamDefault = TRIM(' ()
 	'		FROM SUBSTRING(@Code, StartIndex + 1, EndIndex - StartIndex - 1))
 		WHERE StartIndex > 0 AND StartIndex < EndIndex;
-
+ 
 	UPDATE #Parameters
 		SET ValueDelimiter = CASE
 				WHEN ISNULL(ParamDefault, '') <> 'NULL'
@@ -721,12 +776,12 @@ BEGIN;
 				THEN ''''
 				ELSE ''
 				END;
-
+ 
 	DECLARE @Declare VARCHAR(MAX)
 	SELECT @Declare = 'DECLARE ' + STRING_AGG(ParameterName + ' ' + ParameterDefinition, ', ') + ';'
 		FROM #Parameters
 		WHERE is_output = 1;
-
+ 
 	DECLARE @Exec VARCHAR(MAX);
 	SELECT @Exec = ' ' + STRING_AGG(
 		CASE WHEN is_output = 1
@@ -736,17 +791,18 @@ BEGIN;
 			END, ',
 	')	FROM #Parameters;
 	SET @Exec = 'EXEC ' + @ProcedureName + ISNULL(@Exec, '') + ';';
-
+ 
 	DECLARE @Output VARCHAR(MAX);
 	SELECT @Output = 'SELECT ' + STRING_AGG(QUOTENAME(ParameterName) + ' = ' + ParameterName, ',
 	') + ';'
 		FROM #Parameters
 		WHERE is_output = 1;
-
+ 
 	PRINT @Declare;
 	PRINT @Exec;
 	PRINT @Output;
 END;
+
 GO
 
 GO
@@ -759,14 +815,14 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 /*
-
-Description:	Prodedure to prepare an INSERT statement for a given table
+ 
+Description:	Procedure to prepare an INSERT statement for a given table
 Created:		20 Apr 2017
 Author:			Nick Allan
-
+ 
 --Example use:
 sp_scriptinsert org_statuses;
-
+ 
 */
 CREATE PROCEDURE dbo.sp_ScriptInsert
 	(
@@ -776,17 +832,17 @@ CREATE PROCEDURE dbo.sp_ScriptInsert
 	AS
 BEGIN;
 	SET NOCOUNT ON;
-
+ 
 --DEBUG: declare @schematablename sysname = 'org_statuses', @excludedatecolumnswithdefaults bit = 1;
 	EXEC dbo.sp_MatchTableName @TableName = @SchemaTableName OUTPUT;
 	DECLARE @ObjectId INT = OBJECT_ID(@SchemaTableName, 'U');
-
+ 
 	IF @ObjectId IS NULL
 	BEGIN;
 		DECLARE @ErrorMessage VARCHAR(MAX) = FORMATMESSAGE('Failed to find table named %s', @SchemaTableName);
 		THROW 50000, @ErrorMessage, 1;
 	END;
-
+ 
 	DROP TABLE IF EXISTS #Columns;
 	SELECT c.column_id,
 		ColumnName = CONVERT(NVARCHAR(MAX),
@@ -828,17 +884,17 @@ BEGIN;
 		UPDATE #Columns
 			SET DefaultDefinition = SUBSTRING(DefaultDefinition, 2, LEN(DefaultDefinition) - 2)
 			WHERE DefaultDefinition LIKE '(%)';
-
+ 
 	UPDATE #Columns
 		SET DefaultDefinition = 'N' + DefaultDefinition
 		WHERE IsUnicode = 1
 			AND DefaultDefinition NOT LIKE 'N%';
-
+ 
 	IF @ExcludeDateColumnsWithDefaults = 1
 		DELETE #Columns
 			WHERE TypeName LIKE '%DATE%'
 				AND DefaultDefinition = 'getdate()';
-
+ 
 	UPDATE #Columns
 		SET SelectColumnDelimiter = ';'
 		WHERE column_id = (
@@ -867,13 +923,92 @@ BEGIN;
 				WITHIN GROUP (ORDER BY column_id)
 				FROM #Columns
 			);
-
+ 
 	PRINT '
 INSERT ' + @SchemaTableName + '
 	(
 	' + @InsertColumnList + '
 	)';
 	PRINT '	SELECT ' + @SelectColumnList;
+END;
+GO
+
+GO
+IF @@ERROR <> 0 SET NOEXEC ON;
+GO
+PRINT 'Script: dbo.sp_ScriptObject.sql';
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+/*
+ 
+Description:	Procedure to generate a script for a given @SchemaObjectName
+Created:		11 Mar 2022
+Author:			Nick Allan
+ 
+--Example use:
+sp_ScriptObject sp_ScriptObject
+ 
+*/
+CREATE PROCEDURE dbo.sp_ScriptObject
+	(
+	@SchemaObjectName SYSNAME
+	)
+	AS
+BEGIN;
+	SET NOCOUNT ON;
+	
+--DEBUG: declare @schemaobjectname sysname = 'dbo.tr_DDL_TrackSchemaChanges'
+	DECLARE @ObjectId INT = OBJECT_ID(@SchemaObjectName);
+	IF @ObjectId IS NULL
+		SELECT @ObjectId = OBJECT_ID
+			FROM sys.triggers
+			WHERE name = @SchemaObjectName
+	IF @ObjectId IS NULL
+		THROW 50000, 'Failed to find @SchemaObjectName', 1;
+
+	DECLARE @SchemaName SYSNAME = OBJECT_SCHEMA_NAME(@ObjectId),
+		@ObjectName SYSNAME = OBJECT_NAME(@ObjectId),
+		@Definition NVARCHAR(MAX) = (
+		SELECT [definition] FROM sys.sql_modules WHERE [object_id] = @ObjectId);
+	
+	DECLARE @LineFeed CHAR(1) = CHAR(10);
+	DECLARE @CRLF CHAR(2) = CHAR(13) + @LineFeed;
+	SET @Definition = REPLACE(@Definition, @CRLF, @LineFeed);
+	DROP TABLE IF EXISTS #AlterSql;
+	SELECT LineNumber = ordinal,
+		SqlLine = RTRIM([value])
+		INTO #AlterSql
+		FROM STRING_SPLIT(@Definition, @LineFeed, 1) AS d;
+ 
+	WITH cteCreateStatement
+		AS
+		(
+		SELECT TOP(1) *
+			FROM #AlterSql
+			WHERE SqlLine LIKE CONCAT('CREATE %', @SchemaName, '%.%', @ObjectName, '%')
+			ORDER BY LineNumber
+		)
+		UPDATE cteCreateStatement
+			SET SqlLine = REPLACE(SqlLine, 'CREATE ', 'ALTER ');
+ 
+	DECLARE @LineNumber INT,
+		@MaxId INT;
+	SELECT @LineNumber = MIN(LineNumber),
+		@MaxId = MAX(LineNumber)
+		FROM #AlterSql
+		WHERE SqlLine <> '';
+	WHILE @LineNumber <= @MaxId
+	BEGIN;
+		DECLARE @SqlLine NVARCHAR(MAX);
+		SELECT @SqlLine = SqlLine
+			FROM #AlterSql
+			WHERE LineNumber = @LineNumber;
+		PRINT @SqlLine;
+		SET @LineNumber += 1;
+	END;
 END;
 GO
 
